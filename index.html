@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8" />
+<script>document.documentElement.classList.remove('no-js');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gradient — Learn AI by building it</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFB020'/%3E%3Cstop offset='1' stop-color='%236EE7B7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='18' font-weight='700' text-anchor='middle' fill='%2314161F'%3EG%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: {
+            DEFAULT: '#14161F',
+            800: '#1C1F2C',
+            700: '#242838',
+            600: '#383B4A',
+          },
+          paper: '#F3F1EA',
+          amber: {
+            DEFAULT: '#FFB020',
+            dim: '#B37F1C',
+          },
+          mint: {
+            DEFAULT: '#6EE7B7',
+            dim: '#3E9E7C',
+          },
+        },
+        fontFamily: {
+          display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  :root { color-scheme: dark; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: #14161F;
+    color: #F3F1EA;
+  }
+
+  .ease-spring { transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+  ::selection { background: #FFB020; color: #14161F; }
+
+  :focus-visible {
+    outline: 2px solid #FFB020;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ---- Hand-drawn annotation underline ---- */
+  .annotate { position: relative; display: inline-block; }
+  .annotate svg {
+    position: absolute;
+    left: -4%;
+    right: -4%;
+    bottom: -0.12em;
+    width: 108%;
+    height: 0.5em;
+    overflow: visible;
+  }
+  .annotate path {
+    fill: none;
+    stroke: #FFB020;
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-dasharray: 340;
+    stroke-dashoffset: 340;
+    transition: stroke-dashoffset 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .annotate.in-view path { stroke-dashoffset: 0; }
+
+  .annotate-circle { position: relative; display: inline-block; }
+  .annotate-circle svg {
+    position: absolute;
+    inset: -0.18em -0.22em -0.22em -0.22em;
+    width: calc(100% + 0.44em);
+    height: calc(100% + 0.4em);
+    overflow: visible;
+  }
+  .annotate-circle path {
+    fill: none;
+    stroke: #6EE7B7;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 220;
+    stroke-dashoffset: 220;
+    transition: stroke-dashoffset 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.15s;
+  }
+  .annotate-circle.in-view path { stroke-dashoffset: 0; }
+
+  /* ---- Training log ticker ---- */
+  .ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker 32s linear infinite;
+  }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* ---- Reveal on scroll ---- */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .ticker-track { animation: none; }
+    .annotate path, .annotate-circle path { transition: none; stroke-dashoffset: 0; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  html.no-js .reveal { opacity: 1; transform: none; }
+  html.no-js .annotate path,
+  html.no-js .annotate-circle path { stroke-dashoffset: 0; }
+
+  .card-shadow {
+    box-shadow:
+      0 1px 1px rgba(255, 176, 32, 0.03),
+      0 8px 24px -8px rgba(0, 0, 0, 0.55),
+      0 24px 48px -24px rgba(0, 0, 0, 0.65);
+  }
+  .card-shadow-mint {
+    box-shadow:
+      0 1px 1px rgba(110, 231, 183, 0.04),
+      0 8px 24px -8px rgba(0, 0, 0, 0.55),
+      0 24px 48px -24px rgba(0, 0, 0, 0.65);
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.02 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .radial-hero {
+    background:
+      radial-gradient(60% 55% at 82% 8%, rgba(255, 176, 32, 0.14), transparent 60%),
+      radial-gradient(45% 40% at 10% 85%, rgba(110, 231, 183, 0.08), transparent 60%),
+      radial-gradient(120% 100% at 50% -10%, #1C1F2C 0%, #14161F 55%);
+  }
+
+  .nav-link { position: relative; }
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -4px;
+    width: 100%; height: 1.5px;
+    background: #FFB020;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .nav-link:hover::after, .nav-link:focus-visible::after { transform: scaleX(1); }
+
+  .btn-primary { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, background-color 0.25s ease; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -8px rgba(255, 176, 32, 0.45); }
+  .btn-primary:active { transform: translateY(0); box-shadow: 0 4px 14px -6px rgba(255, 176, 32, 0.4); }
+
+  .btn-ghost { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.25s ease, background-color 0.25s ease; }
+  .btn-ghost:hover { transform: translateY(-2px); border-color: #FFB020; background-color: rgba(255, 176, 32, 0.06); }
+  .btn-ghost:active { transform: translateY(0); }
+
+  .track-card { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.4s ease; }
+  .track-card:hover { transform: translateY(-4px); border-color: rgba(255, 176, 32, 0.4); }
+
+  .mentor-card { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .mentor-card:hover { transform: translateY(-3px); }
+
+  .stamp {
+    transform: rotate(-6deg);
+  }
+
+  .path-line {
+    background: repeating-linear-gradient(to right, #383B4A 0 8px, transparent 8px 16px);
+  }
+</style>
+</head>
+<body class="font-sans antialiased">
+
+<!-- ================= NAV ================= -->
+<header class="fixed top-0 inset-x-0 z-50 border-b border-white/[0.06] bg-ink/85 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-2.5 group">
+      <span class="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber to-mint text-ink font-mono font-bold text-sm">G</span>
+      <span class="font-display text-lg tracking-tight text-paper">Gradient</span>
+    </a>
+
+    <nav class="hidden md:flex items-center gap-8 font-medium text-sm text-paper/75">
+      <a href="#curriculum" class="nav-link hover:text-paper transition-colors">Curriculum</a>
+      <a href="#how" class="nav-link hover:text-paper transition-colors">How it works</a>
+      <a href="#mentors" class="nav-link hover:text-paper transition-colors">Mentors</a>
+      <a href="#outcomes" class="nav-link hover:text-paper transition-colors">Outcomes</a>
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <a href="#enroll" class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-amber text-ink font-semibold text-sm px-5 py-2.5 btn-primary">
+        Start free
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5 11.5 7 8 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <button id="menuBtn" class="md:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-white/10 text-paper" aria-label="Open menu" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 5h14M2 9h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="mobileMenu" class="md:hidden hidden border-t border-white/[0.06] bg-ink px-5 py-4 flex flex-col gap-4 text-sm font-medium text-paper/80">
+    <a href="#curriculum" class="hover:text-paper">Curriculum</a>
+    <a href="#how" class="hover:text-paper">How it works</a>
+    <a href="#mentors" class="hover:text-paper">Mentors</a>
+    <a href="#outcomes" class="hover:text-paper">Outcomes</a>
+    <a href="#enroll" class="inline-flex items-center justify-center rounded-full bg-amber text-ink font-semibold px-5 py-2.5 mt-1">Start free</a>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section id="top" class="relative radial-hero pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">
+  <div class="absolute inset-0 bg-noise opacity-[0.35] pointer-events-none"></div>
+
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 relative">
+    <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-16 items-center">
+
+      <div class="reveal">
+        <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[11px] tracking-wide text-mint mb-7">
+          <span class="h-1.5 w-1.5 rounded-full bg-mint animate-pulse"></span>
+          MODEL: YOU &nbsp;·&nbsp; STATUS: TRAINING
+        </div>
+
+        <h1 class="font-display text-[2.75rem] leading-[1.05] sm:text-6xl sm:leading-[1.03] tracking-[-0.03em] text-paper">
+          Learn AI by<br />
+          <span class="annotate">building it
+            <svg viewBox="0 0 300 24" preserveAspectRatio="none"><path d="M4 14C60 4 140 3 180 10C215 16 260 18 296 9" /></svg>
+          </span>.
+        </h1>
+
+        <p class="mt-6 text-lg text-paper/65 leading-[1.7] max-w-lg">
+          Skip the lecture halls. Ship real models, agents, and pipelines from week one — graded by working code, not multiple-choice quizzes.
+        </p>
+
+        <div class="mt-9 flex flex-wrap items-center gap-4">
+          <a href="#enroll" class="inline-flex items-center gap-2 rounded-full bg-amber text-ink font-semibold px-6 py-3.5 btn-primary">
+            Start learning free
+            <svg width="15" height="15" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5 11.5 7 8 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a href="#curriculum" class="inline-flex items-center gap-2 rounded-full border border-white/15 text-paper font-semibold px-6 py-3.5 btn-ghost">
+            See the curriculum
+          </a>
+        </div>
+
+        <div class="mt-10 flex items-center gap-5 text-paper/45 font-mono text-xs">
+          <div class="flex -space-x-2.5">
+            <img src="https://placehold.co/32x32/1C1F2C/6EE7B7?text=%20" class="h-8 w-8 rounded-full ring-2 ring-ink" alt="" />
+            <img src="https://placehold.co/32x32/1C1F2C/FFB020?text=%20" class="h-8 w-8 rounded-full ring-2 ring-ink" alt="" />
+            <img src="https://placehold.co/32x32/1C1F2C/F3F1EA?text=%20" class="h-8 w-8 rounded-full ring-2 ring-ink" alt="" />
+          </div>
+          <span>4,900+ learners training right now</span>
+        </div>
+      </div>
+
+      <!-- Progress / grade card -->
+      <div class="reveal relative lg:justify-self-end w-full max-w-sm" style="transition-delay:0.15s">
+        <div class="absolute -top-4 -left-4 h-full w-full rounded-2xl border border-white/10"></div>
+        <div class="relative rounded-2xl border border-white/10 bg-ink-800 p-6 card-shadow">
+          <div class="flex items-center justify-between mb-5">
+            <span class="font-mono text-[11px] tracking-widest text-paper/50">YOUR PROGRESS</span>
+            <span class="font-mono text-[11px] text-mint">86% overall</span>
+          </div>
+
+          <ul class="space-y-3.5">
+            <li class="flex items-center justify-between">
+              <span class="flex items-center gap-2.5 text-sm text-paper/85">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-mint/15 text-mint">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="m2 6.2 2.6 2.6L10 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                Python for ML
+              </span>
+              <span class="font-mono text-xs text-paper/45">98%</span>
+            </li>
+            <li class="flex items-center justify-between">
+              <span class="flex items-center gap-2.5 text-sm text-paper/85">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-mint/15 text-mint">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="m2 6.2 2.6 2.6L10 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                Neural networks
+              </span>
+              <span class="font-mono text-xs text-paper/45">94%</span>
+            </li>
+            <li class="flex items-center justify-between">
+              <span class="flex items-center gap-2.5 text-sm text-paper">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-amber/15 text-amber">
+                  <span class="h-1.5 w-1.5 rounded-full bg-amber"></span>
+                </span>
+                Transformers &amp; attention
+              </span>
+              <span class="font-mono text-xs text-amber">61%</span>
+            </li>
+            <li class="flex items-center justify-between">
+              <span class="flex items-center gap-2.5 text-sm text-paper/35">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 text-paper/20"></span>
+                Agents &amp; tool use
+              </span>
+              <span class="font-mono text-xs text-paper/25">locked</span>
+            </li>
+          </ul>
+
+          <div class="mt-5 pt-4 border-t border-white/10">
+            <p class="font-display italic text-sm text-paper/70">"On track — ship the attention layer by Friday."</p>
+            <p class="mt-1.5 font-mono text-[10px] tracking-wide text-paper/35">— MENTOR REVIEW, LIVE</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Training log ticker -->
+  <div class="mt-16 sm:mt-20 border-y border-white/[0.06] bg-black/20 py-3 overflow-hidden">
+    <div class="ticker-track font-mono text-xs text-paper/30 gap-10 pr-10">
+      <span class="flex gap-10 shrink-0 pr-10">
+        <span>[epoch 07] loss 0.183 → 0.121</span>
+        <span>[epoch 08] loss 0.121 → 0.094</span>
+        <span>[epoch 09] loss 0.094 → 0.071</span>
+        <span>[epoch 10] accuracy 0.91 → 0.94</span>
+        <span>[epoch 11] loss 0.071 → 0.058</span>
+        <span>[epoch 12] eval passed ✓</span>
+        <span>[epoch 13] checkpoint saved</span>
+      </span>
+      <span class="flex gap-10 shrink-0 pr-10" aria-hidden="true">
+        <span>[epoch 07] loss 0.183 → 0.121</span>
+        <span>[epoch 08] loss 0.121 → 0.094</span>
+        <span>[epoch 09] loss 0.094 → 0.071</span>
+        <span>[epoch 10] accuracy 0.91 → 0.94</span>
+        <span>[epoch 11] loss 0.071 → 0.058</span>
+        <span>[epoch 12] eval passed ✓</span>
+        <span>[epoch 13] checkpoint saved</span>
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRUST BAR ================= -->
+<section class="py-12 border-b border-white/[0.06]">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <p class="text-center font-mono text-[11px] tracking-widest text-paper/35 mb-7">ENGINEERS NOW BUILDING AT</p>
+    <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-5 text-paper/30 font-display text-xl tracking-tight">
+      <span>Northwind</span>
+      <span>Vertex Labs</span>
+      <span>Solstice</span>
+      <span>Kepler &amp; Co.</span>
+      <span>Marrow</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="how" class="py-24 sm:py-32">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="max-w-xl reveal">
+      <p class="font-mono text-xs tracking-widest text-mint mb-4">THE PATH</p>
+      <h2 class="font-display text-3xl sm:text-4xl tracking-[-0.02em] text-paper">
+        Four stages. One <span class="annotate-circle">working model<svg viewBox="0 0 140 46"><path d="M6 8C4 24 8 38 26 40C60 44 110 42 130 26C138 16 128 4 100 3C60 2 20 4 8 12"/></svg></span> at the end.
+      </h2>
+    </div>
+
+    <div class="mt-16 relative">
+      <div class="hidden md:block absolute top-6 left-[12.5%] right-[12.5%] h-px path-line"></div>
+      <div class="grid md:grid-cols-4 gap-10 md:gap-6">
+
+        <div class="reveal" style="transition-delay:0.05s">
+          <div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-ink-800 border border-white/15 font-mono text-sm text-paper mb-5">01</div>
+          <h3 class="font-display text-lg text-paper mb-2">Assess</h3>
+          <p class="text-sm text-paper/55 leading-[1.7]">A placement project benchmarks your baseline — no guessing which track fits.</p>
+          <span class="inline-block mt-3 font-mono text-[10px] tracking-wide text-paper/35 border border-white/10 rounded px-2 py-1">confidence: low → high</span>
+        </div>
+
+        <div class="reveal" style="transition-delay:0.1s">
+          <div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-ink-800 border border-white/15 font-mono text-sm text-paper mb-5">02</div>
+          <h3 class="font-display text-lg text-paper mb-2">Build</h3>
+          <p class="text-sm text-paper/55 leading-[1.7]">Ship a real project every week — a classifier, a RAG pipeline, an agent that actually runs.</p>
+          <span class="inline-block mt-3 font-mono text-[10px] tracking-wide text-paper/35 border border-white/10 rounded px-2 py-1">tests: passing</span>
+        </div>
+
+        <div class="reveal" style="transition-delay:0.15s">
+          <div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-ink-800 border border-white/15 font-mono text-sm text-paper mb-5">03</div>
+          <h3 class="font-display text-lg text-paper mb-2">Ship</h3>
+          <p class="text-sm text-paper/55 leading-[1.7]">Deploy to a public portfolio, reviewed by a working mentor pass — not an autograder alone.</p>
+          <span class="inline-block mt-3 font-mono text-[10px] tracking-wide text-paper/35 border border-white/10 rounded px-2 py-1">reviewed: human + AI</span>
+        </div>
+
+        <div class="reveal" style="transition-delay:0.2s">
+          <div class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-amber/15 border border-amber/40 font-mono text-sm text-amber mb-5">04</div>
+          <h3 class="font-display text-lg text-paper mb-2">Certify</h3>
+          <p class="text-sm text-paper/55 leading-[1.7]">Earn a track certificate once your model clears eval — proof you can ship, not just recall.</p>
+          <span class="inline-block mt-3 font-mono text-[10px] tracking-wide text-mint border border-mint/25 rounded px-2 py-1">eval: passed ✓</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CURRICULUM ================= -->
+<section id="curriculum" class="py-24 sm:py-32 border-t border-white/[0.06] bg-ink-800/40">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="flex flex-wrap items-end justify-between gap-6 mb-14 reveal">
+      <div class="max-w-lg">
+        <p class="font-mono text-xs tracking-widest text-amber mb-4">TRACKS</p>
+        <h2 class="font-display text-3xl sm:text-4xl tracking-[-0.02em] text-paper">Pick a track. Every one ends in a shipped project.</h2>
+      </div>
+      <p class="text-sm text-paper/50 max-w-xs leading-[1.7]">No pre-recorded lecture series. Every module is a build, reviewed against real evaluation criteria.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-5">
+
+      <div class="track-card reveal rounded-2xl border border-white/10 bg-ink-800 p-7">
+        <div class="flex items-center justify-between mb-5">
+          <span class="font-mono text-[10px] tracking-widest text-mint border border-mint/25 rounded-full px-2.5 py-1">BEGINNER · 6 WEEKS</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-paper/30"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 class="font-display text-xl text-paper mb-2">Applied ML Foundations</h3>
+        <p class="text-sm text-paper/55 leading-[1.7] mb-5">For engineers new to ML. Regression to neural nets, taught through five shipped models.</p>
+        <a href="#" class="inline-flex items-center gap-1.5 text-sm font-semibold text-paper hover:text-amber transition-colors">View syllabus →</a>
+      </div>
+
+      <div class="track-card reveal rounded-2xl border border-white/10 bg-ink-800 p-7" style="transition-delay:0.05s">
+        <div class="flex items-center justify-between mb-5">
+          <span class="font-mono text-[10px] tracking-widest text-amber border border-amber/25 rounded-full px-2.5 py-1">INTERMEDIATE · 8 WEEKS</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-paper/30"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 class="font-display text-xl text-paper mb-2">LLM Engineering</h3>
+        <p class="text-sm text-paper/55 leading-[1.7] mb-5">Prompting, retrieval, evals, and agents. Build and grade your own eval harness.</p>
+        <a href="#" class="inline-flex items-center gap-1.5 text-sm font-semibold text-paper hover:text-amber transition-colors">View syllabus →</a>
+      </div>
+
+      <div class="track-card reveal rounded-2xl border border-white/10 bg-ink-800 p-7" style="transition-delay:0.1s">
+        <div class="flex items-center justify-between mb-5">
+          <span class="font-mono text-[10px] tracking-widest text-paper/50 border border-white/15 rounded-full px-2.5 py-1">ADVANCED · 10 WEEKS</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-paper/30"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 class="font-display text-xl text-paper mb-2">AI Systems at Scale</h3>
+        <p class="text-sm text-paper/55 leading-[1.7] mb-5">Serving, fine-tuning, and infra. Take a model from notebook to production load.</p>
+        <a href="#" class="inline-flex items-center gap-1.5 text-sm font-semibold text-paper hover:text-amber transition-colors">View syllabus →</a>
+      </div>
+
+      <div class="track-card reveal rounded-2xl border border-white/10 bg-ink-800 p-7" style="transition-delay:0.15s">
+        <div class="flex items-center justify-between mb-5">
+          <span class="font-mono text-[10px] tracking-widest text-mint border border-mint/25 rounded-full px-2.5 py-1">BEGINNER · 4 WEEKS</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-paper/30"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 class="font-display text-xl text-paper mb-2">AI for Product Teams</h3>
+        <p class="text-sm text-paper/55 leading-[1.7] mb-5">Ship AI features without an ML degree. Scope, evaluate, and de-risk AI in production.</p>
+        <a href="#" class="inline-flex items-center gap-1.5 text-sm font-semibold text-paper hover:text-amber transition-colors">View syllabus →</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= OUTCOMES + TESTIMONIAL ================= -->
+<section id="outcomes" class="py-24 sm:py-32">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-14 items-center">
+
+    <div class="reveal">
+      <p class="font-mono text-xs tracking-widest text-amber mb-4">MARKED UP BY A MENTOR</p>
+      <blockquote class="font-display text-2xl sm:text-3xl leading-snug tracking-[-0.01em] text-paper">
+        "I'd watched a dozen ML tutorials before this. Gradient was the first place that made me
+        <span class="annotate-circle">ship something that broke in production<svg viewBox="0 0 320 46"><path d="M6 8C4 24 8 38 26 40C120 44 260 42 300 26C312 16 300 4 220 3C140 2 20 4 8 12"/></svg></span>
+        — and fix it."
+      </blockquote>
+      <div class="mt-7 flex items-center gap-3">
+        <img src="https://placehold.co/44x44/1C1F2C/F3F1EA?text=%20" class="h-11 w-11 rounded-full" alt="" />
+        <div>
+          <p class="text-sm font-semibold text-paper">Renata Oduya</p>
+          <p class="font-mono text-[11px] text-paper/40">Backend Engineer → ML Engineer, Solstice</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal rounded-2xl border border-white/10 bg-ink-800 p-8 card-shadow-mint" style="transition-delay:0.1s">
+      <p class="font-mono text-[11px] tracking-widest text-paper/40 mb-6">// outcomes.log</p>
+      <ul class="space-y-5 font-mono text-sm">
+        <li class="flex items-start gap-3">
+          <span class="text-amber mt-0.5">▲</span>
+          <span class="text-paper/80">3.2x more likely to ship a project in the first 30 days</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-mint mt-0.5">▲</span>
+          <span class="text-paper/80">89% pass their first mentor review on submission</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-amber mt-0.5">▲</span>
+          <span class="text-paper/80">12,400 models shipped by learners to date</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-mint mt-0.5">▲</span>
+          <span class="text-paper/80">41% receive a role offer within 6 months</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= MENTORS ================= -->
+<section id="mentors" class="py-24 sm:py-32 border-t border-white/[0.06] bg-ink-800/40">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="max-w-lg mb-14 reveal">
+      <p class="font-mono text-xs tracking-widest text-mint mb-4">WHO GRADES YOUR WORK</p>
+      <h2 class="font-display text-3xl sm:text-4xl tracking-[-0.02em] text-paper">Mentors who ship AI systems for a living.</h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="mentor-card reveal">
+        <img src="https://placehold.co/300x340/1C1F2C/F3F1EA?text=%20" class="w-full rounded-2xl mb-4" alt="" />
+        <p class="font-display text-lg text-paper">Marcus Webb</p>
+        <p class="font-mono text-[11px] text-paper/40 mt-1">11 yrs · ex-DeepMind</p>
+      </div>
+      <div class="mentor-card reveal" style="transition-delay:0.05s">
+        <img src="https://placehold.co/300x340/1C1F2C/F3F1EA?text=%20" class="w-full rounded-2xl mb-4" alt="" />
+        <p class="font-display text-lg text-paper">Priya Shankar</p>
+        <p class="font-mono text-[11px] text-paper/40 mt-1">8 yrs · ex-Stripe ML</p>
+      </div>
+      <div class="mentor-card reveal" style="transition-delay:0.1s">
+        <img src="https://placehold.co/300x340/1C1F2C/F3F1EA?text=%20" class="w-full rounded-2xl mb-4" alt="" />
+        <p class="font-display text-lg text-paper">Jonas Reiter</p>
+        <p class="font-mono text-[11px] text-paper/40 mt-1">14 yrs · infra @ scale</p>
+      </div>
+      <div class="mentor-card reveal" style="transition-delay:0.15s">
+        <img src="https://placehold.co/300x340/1C1F2C/F3F1EA?text=%20" class="w-full rounded-2xl mb-4" alt="" />
+        <p class="font-display text-lg text-paper">Ada Lindqvist</p>
+        <p class="font-mono text-[11px] text-paper/40 mt-1">9 yrs · applied research</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINAL CTA ================= -->
+<section id="enroll" class="relative py-28 sm:py-36 overflow-hidden border-t border-white/[0.06]">
+  <div class="absolute inset-0 radial-hero"></div>
+  <div class="absolute inset-0 bg-noise opacity-[0.3] pointer-events-none"></div>
+
+  <div class="max-w-3xl mx-auto px-5 sm:px-8 text-center relative reveal">
+    <div class="stamp inline-flex items-center gap-2 rounded-full border-2 border-amber/60 text-amber font-mono text-xs tracking-widest px-4 py-2 mb-8">
+      APPROVED FOR TRAINING
+    </div>
+    <h2 class="font-display text-4xl sm:text-5xl tracking-[-0.03em] text-paper leading-[1.08]">
+      Your model starts<br class="hidden sm:block" /> training today.
+    </h2>
+    <p class="mt-6 text-lg text-paper/60 max-w-md mx-auto leading-[1.7]">
+      Free to start. No credit card. Your first project ships in week one.
+    </p>
+    <div class="mt-9 flex flex-wrap items-center justify-center gap-4">
+      <a href="#" class="inline-flex items-center gap-2 rounded-full bg-amber text-ink font-semibold px-7 py-4 btn-primary">
+        Start learning free
+        <svg width="15" height="15" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5 11.5 7 8 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="#curriculum" class="inline-flex items-center gap-2 rounded-full border border-white/15 text-paper font-semibold px-7 py-4 btn-ghost">
+        Talk to a mentor
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="border-t border-white/[0.06] py-16">
+  <div class="max-w-7xl mx-auto px-5 sm:px-8">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
+      <div class="lg:col-span-2">
+        <a href="#top" class="flex items-center gap-2.5 mb-4">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber to-mint text-ink font-mono font-bold text-sm">G</span>
+          <span class="font-display text-lg tracking-tight text-paper">Gradient</span>
+        </a>
+        <p class="text-sm text-paper/45 leading-[1.7] max-w-xs">The AI learning platform graded by working code — not quizzes.</p>
+      </div>
+
+      <div>
+        <p class="font-mono text-[11px] tracking-widest text-paper/35 mb-4">TRACKS</p>
+        <ul class="space-y-3 text-sm text-paper/60">
+          <li><a href="#curriculum" class="hover:text-paper transition-colors">Applied ML</a></li>
+          <li><a href="#curriculum" class="hover:text-paper transition-colors">LLM Engineering</a></li>
+          <li><a href="#curriculum" class="hover:text-paper transition-colors">AI Systems</a></li>
+          <li><a href="#curriculum" class="hover:text-paper transition-colors">AI for Product</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="font-mono text-[11px] tracking-widest text-paper/35 mb-4">COMPANY</p>
+        <ul class="space-y-3 text-sm text-paper/60">
+          <li><a href="#" class="hover:text-paper transition-colors">About</a></li>
+          <li><a href="#mentors" class="hover:text-paper transition-colors">Mentors</a></li>
+          <li><a href="#" class="hover:text-paper transition-colors">Careers</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="font-mono text-[11px] tracking-widest text-paper/35 mb-4">LEGAL</p>
+        <ul class="space-y-3 text-sm text-paper/60">
+          <li><a href="#" class="hover:text-paper transition-colors">Privacy</a></li>
+          <li><a href="#" class="hover:text-paper transition-colors">Terms</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-14 pt-8 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-4">
+      <p class="font-mono text-[11px] text-paper/30">© 2026 Gradient. All rights reserved.</p>
+      <p class="font-mono text-[11px] text-paper/30">Built with real gradients, not marketing ones.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const menuBtn = document.getElementById('menuBtn');
+  const mobileMenu = document.getElementById('mobileMenu');
+  menuBtn.addEventListener('click', () => {
+    const isHidden = mobileMenu.classList.contains('hidden');
+    mobileMenu.classList.toggle('hidden');
+    menuBtn.setAttribute('aria-expanded', String(isHidden));
+  });
+  mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    mobileMenu.classList.add('hidden');
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }));
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll('.reveal, .annotate, .annotate-circle').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
